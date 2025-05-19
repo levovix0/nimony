@@ -393,6 +393,7 @@ proc buildGraph*(config: sink NifConfig; project: string; forceRebuild, silentMa
       forceRebuild: forceRebuild, moduleFlags: moduleFlags, nimsem: findTool("nimsem"),
       cmd: cmd, isGeneratingFinal: isFinal)
     let p = c.toPair(project)
+    writeFile "nimcache/modname", p.modname
     c.rootNode = Node(files: @[p], id: 0, parent: -1, active: 0, isSystem: IsSystem in moduleFlags)
     c.nodes.add c.rootNode
     c.processedModules.incl p.modname

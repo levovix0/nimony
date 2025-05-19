@@ -1,0 +1,6 @@
+(.nif24)
+(stmts
+  (proc :main.c . (i +32) . (stmts
+    (ret +69)
+  ))
+)

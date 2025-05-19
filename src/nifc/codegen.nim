@@ -693,6 +693,11 @@ proc generateCode*(s: var State, inp, outp: string; flags: set[GenFlag]) =
   let typeDecls = move c.code
 
   var n = beginRead(c.m.src)
+  
+  #!!!!!!!!!!!!!!!!
+  when true: echo n
+  #!!!!!!!!!!!!!!!!
+  
   traverseCode c, n
   var f = CppFile(f: open(outp, fmWrite))
   f.write "#define NIM_INTBITS " & $s.bits & "\n"

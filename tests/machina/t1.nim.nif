@@ -1,0 +1,14 @@
+(.nif24)
+(.vendor "hexer")
+(.dialect "nifc")
+0,2,tests/machina/t1.nim(stmts ,3
+ (proc 5 :main.c 10
+  (params) 2
+  (i -1) 16
+  (pragmas
+   (was main.c)) 2,1
+  (stmts
+   (var :result.0 . ,~1
+    (i -1) .)
+   (asgn result.0 +69) ~2,~1
+   (ret result.0))))
