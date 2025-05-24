@@ -7,9 +7,8 @@
 
 if test $argv[1] = n
   tools/nimony.fish c --noSystem tests/machina/$argv[2]
-  # tools/nifc.fish n tests/machina/$argv[2].nif
-  # cat nimcache/$argv[2].S
-  echo todo
+  tools/machina.fish c tests/machina/$argv[2].nif --out:nimcache/$argv[2].asm.nif
+  cat nimcache/$argv[2].asm.nif
 else
   tools/nimony.fish c --noSystem tests/machina/$argv[2]
   tools/nifc.fish c tests/machina/$argv[2].nif
