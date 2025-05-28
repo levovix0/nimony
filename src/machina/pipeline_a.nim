@@ -100,9 +100,12 @@ proc transformSimpleRvalue(ctx: var MaContext, n: var Cursor) =
     if desc.typ.size > 8:
       ctx.error("too large for simple rvalue", n)
 
-    ctx.makeTree "-", n.info:
-      ctx.dest.addIdent "pstack"
-      ctx.dest.addIntLit desc.offset
+    if desc.offset == 0:
+      ctx.dest.addIdent "pstackframe"
+    else:
+      ctx.makeTree "+", n.info:
+        ctx.dest.addIdent "pstackframe"
+        ctx.dest.addIntLit desc.offset
 
     inc n
 
@@ -154,13 +157,12 @@ proc transformVar(ctx: var MaContext, n: var Cursor) =
 
   let stackframe = ctx.stackframe.addr
   
-  let lastOffset = block:
+  desc.offset = block:
     var r = 0
     for v in stackframe.vars.values:
-      r = max(r, v.offset)
+      r = max(r, v.offset + v.typ.size)
     r
 
-  desc.offset = lastOffset + desc.typ.size
   if desc.offset mod desc.typ.align != 0:
     desc.offset += desc.typ.align - (desc.offset mod desc.typ.align)
 
@@ -189,6 +191,19 @@ proc transformAsgn(ctx: var MaContext, n: var Cursor) =
 
 
 
+proc genRet(ctx: var MaContext, n: var Cursor) =
+  ctx.makeTree "asgn", n.info:
+    ctx.dest.addIntLit ctx.config.bits
+    ctx.dest.addIdent "pstack"
+    ctx.dest.addIdent "pstackframe"
+
+  ctx.makeTree "pop", n.info:
+    ctx.dest.addIdent "pstackframe"
+
+  ctx.dest.addIdent "ret"
+
+
+
 proc transformRet(ctx: var MaContext, n: var Cursor) =
   let linfo = n.info
   
@@ -205,10 +220,7 @@ proc transformRet(ctx: var MaContext, n: var Cursor) =
     ctx.dest.add tagToken("retreg", linfo)
     transformSimpleRvalue(ctx, n)
   
-  ctx.makeTree "pop", n.info:
-    ctx.dest.addIdent "pstack"
-
-  ctx.dest.addIdent "ret"
+  genRet(ctx, n)
 
   ctx.skipParRi n
 
@@ -270,16 +282,20 @@ proc transformProc(ctx: var MaContext, n: var Cursor) =
   
   # - stmts -
   ctx.makeTree "push", n.info:
+    ctx.dest.addIdent "pstackframe"
+
+  ctx.makeTree "asgn", n.info:
+    ctx.dest.addIntLit ctx.config.bits
+    ctx.dest.addIdent "pstackframe"
     ctx.dest.addIdent "pstack"
+  
+  # todo: sub stack to stackframe total size
 
   ctx.with procsAllowed, false:
     transformStmts(ctx, n)
 
   if not hasReturnType:
-    ctx.makeTree "pop", n.info:
-      ctx.dest.addIdent "pstack"
-
-    ctx.dest.addIdent "ret"
+    genRet(ctx, n)
   
 
   ctx.skipParRi n

@@ -6,15 +6,15 @@ import ./ [clioptions, pipeline, pipeline_a]
 
 const
   Version = "0.1"
-  Usage = "Machina Compiler. Version " & Version & """
+  Usage = "Nifasm Compiler. Version " & Version & """
 
 Usage:
-  machina [options] [command] [arguments]
+  nifasm [options] [command] [arguments]
 Command:
-  c file.nif [file2.nif]    compile NifC files to NifAsm
+  n file.nif [file2.nif]    compile NifAsm files to Nasm
 
 Options:
-  --isMain                  mark the file as the main program
+  --executable              mark the file as executable
   --bits:N                  `(i -1)` has N bits; possible values: 64, 32, 16
   --nimcache:PATH           set the path used for generated files
   --version                 show the version
@@ -36,12 +36,12 @@ proc handleCmdLine() =
     case kind
     of cmdArgument:
       case key.normalize:
-      of "c":
-        config.action = atC
+      of "n":
+        config.action = atNasm
 
       else:
         case config.action:
-        of atC:
+        of atNasm:
           config.files.add (key, "")
           
         of atNone:
@@ -58,7 +58,7 @@ proc handleCmdLine() =
       
       of "help", "h": writeHelp()
       of "version", "v": writeVersion()
-      of "ismain": config.isMain = true
+      of "executable": config.executable = true
       
       of "nimcache":
         config.cacheDir = val
@@ -77,13 +77,13 @@ proc handleCmdLine() =
 
   for (inpFile, outFile) in config.files.mitems:
     if outFile == "":
-      outFile = config.cacheDir / inpFile.splitFile.name & ".asm.nif"
+      outFile = config.cacheDir / inpFile.splitFile.name.splitFile.name & ".asm"
 
   if config.files.len != 0:
     for (inpFile, outFile) in config.files:
       case config.action
-      of atC:
-        machinaPipeline(inpFile, outFile, config)
+      of atNasm:
+        nifasmPipeline(inpFile, outFile, config)
       
       of atNone:
         quit "target are not specified"

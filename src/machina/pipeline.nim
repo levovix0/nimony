@@ -151,10 +151,12 @@ proc machinaPipeline*(inpFile, outFile: string; conf: Config) =
   var inBuf = inStream.fromStream
   var tt = inBuf.beginRead
 
+
   when defined(machina_debug):
     echo tt
 
-    echo "machina: start. ----------"
+    echo "machina: start ----------"
+
 
   try:
     machinaTransform(ctx, tt)

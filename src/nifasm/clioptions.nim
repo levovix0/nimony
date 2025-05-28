@@ -1,17 +1,13 @@
 
 type
-  Backend* = enum
-    nifasmDefault
-
   Action* = enum
-    atNone, atC
+    atNone, atNasm
 
   Config* = object
-    backend*: Backend
     action*: Action
     cacheDir*: string
     files*: seq[tuple[inpf, outf: string]]
     
-    isMain*: bool
+    executable*: bool
     bits*: int
 
