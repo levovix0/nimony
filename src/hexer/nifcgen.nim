@@ -360,6 +360,9 @@ proc trAsNamedType(c: var EContext; n: var Cursor) =
 
     swap c.dest, buf
     c.pending.add buf
+    # Convert NifC type decl to Nim-gear2 type decl by
+    # inserting empty export marker and type vars
+    buf.insert [dotToken(NoLineInfo), dotToken(NoLineInfo)], 1
     programs.publish val, buf
   # regardless of what we had to do, we still need to add the typename:
   if k == RefT:
@@ -1311,7 +1314,7 @@ proc trExpr(c: var EContext; n: var Cursor) =
        InSetX, CardX, BracketX, CurlyX, TupX, CompilesX, DeclaredX, DefinedX, HighX, LowX, TypeofX, UnpackX,
        FieldsX, FieldpairsX, EnumtostrX, IsmainmoduleX, DefaultobjX, DefaulttupX, DoX, CchoiceX, OchoiceX,
        EmoveX, DestroyX, DupX, CopyX, WasmovedX, SinkhX, TraceX, CurlyatX, PragmaxX, QuotedX, TabconstrX,
-       InstanceofX, ProccallX, InternalTypeNameX, InternalFieldPairsX, FailedX:
+       InstanceofX, ProccallX, InternalTypeNameX, InternalFieldPairsX, FailedX, IsX:
       error c, "BUG: not eliminated: ", n
       #skip n
     of AtX, PatX, ParX, NilX, InfX, NeginfX, NanX, FalseX, TrueX, AndX, OrX, NotX, NegX,
