@@ -131,6 +131,7 @@ proc writeStmts(c: var MaContext, b: var Builder) =
     inc n
 
   b.endTree()
+  endRead c.dest
 
 
 
@@ -160,6 +161,7 @@ proc machinaPipeline*(inpFile, outFile: string; conf: Config) =
 
   try:
     machinaTransform(ctx, tt)
+    endRead inBuf
   except:
     when defined(machina_debug):
       var b = nifbuilder.open(outFile)
@@ -197,7 +199,7 @@ proc machinaPipeline*(inpFile, outFile: string; conf: Config) =
 
     raise
   
-  b.endTree()
+  # b.endTree()  # no need to end the tree since we've generated (stmt ...) block inside machinaTransform()
   b.close()
 
   

@@ -6,23 +6,24 @@ import ./ [clioptions]
 
 type
   TypeDesc* {.shallow.} = object
-    size*: int
-    align*: int
+    size*: int  # in bytes
+    align*: int  # in bytes
     fields*: Table[string, FieldDesc]
 
 
   FieldDesc* = object
-    offset*: int
+    offset*: int  # in bytes
     typ*: TypeDesc
 
 
   VarDesc* = object
-    offset*: int
+    offset*: int  # in bytes
     typ*: TypeDesc
 
 
   StackFrame* = object
     vars*: Table[string, VarDesc]
+    size*: int  # in bytes
 
 
   MaContext* = object
@@ -44,3 +45,6 @@ template with*(ctx: var MaContext, param: untyped, val: untyped, body: untyped) 
   body
   ctx.param = old_val
 
+
+template currentStackframe*(ctx: MaContext): ptr StackFrame =
+  ctx.stackframe.addr

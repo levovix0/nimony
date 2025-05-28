@@ -1,7 +1,7 @@
 import std / [parseopt, strutils, os, assertions]
 include .. / lib / nifprelude
 
-import ./ [clioptions, pipeline, pipeline_a]
+import ./ [clioptions, pipeline, pipeline_a, pipeline_visit_vars]
 
 
 const

@@ -78,6 +78,27 @@ proc copyTree*(ctx: var MaContext, n: var Cursor): TokenBuf =
     inc n
 
 
+proc skipTree*(ctx: var MaContext, n: var Cursor) =
+  if n.kind == ParLe:
+    inc n
+
+    var nested = 1
+    while nested > 0:
+      case n.kind
+      of ParLe:
+        inc nested
+      of ParRi:
+        dec nested
+      of EofToken:
+        error ctx, "expected ')', but EOF reached"
+      else: discard
+      
+      inc n
+  
+  else:
+    inc n
+
+
 template makeTree*(ctx: var MaContext, tag: string, info: PackedLineInfo, body: untyped) =
   ctx.dest.add tagToken(tag, info)
   body

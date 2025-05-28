@@ -6,6 +6,15 @@ import ".." / nimony / [nimony_model]
 import ./ [context, transutils, pipeline_fwd]
 
 
+
+proc querySize*(s: StackFrame): int =
+  result = 0
+
+  for v in s.vars.values:
+    result = max(result, v.offset + v.typ.size)
+
+
+
 {.push, nimcall, exportc: "machina_$1".}
 
 
@@ -35,54 +44,8 @@ proc transformStmts(ctx: var MaContext, n: var Cursor) =
 
 
 
-proc transformType(ctx: var MaContext, n: var Cursor): TypeDesc =
-  result = TypeDesc()
-
-  case n.kind
-  of ParLe:
-    case n.typeKind
-    of IT:
-      inc n
-
-      case n.kind
-      of IntLit:
-        var bits = pool.integers[n.intId]
-        if bits == -1:
-          bits = ctx.config.bits
-        
-        result.size = bits div 8
-        result.align = bits div 8
-
-        inc n
-        ctx.skipParRi n
-      
-      else:
-        ctx.error("expected integer literal, but got", n)
-
-    else:
-      ctx.error("expected i, but got", n)
-  
-  else:
-    ctx.error("expected '(', but got", n)
-
-
-
-proc lookupSym(ctx: var MaContext, n: var Cursor): ptr VarDesc =
-  let stackframe = ctx.stackframe.addr
-
-  # - dest -
-  case n.kind
-  of Symbol:
-    result = stackframe.vars.mgetOrPut(pool.syms[n.symId], VarDesc(offset: -1)).addr
-    if result.offset == -1:
-      ctx.error("unknown variable", n)
-    
-  else: ctx.error("expected symbol, got", n)
-
-
-
 proc transformSimpleRvalue(ctx: var MaContext, n: var Cursor) =
-  let stackframe = ctx.stackframe.addr
+  let stackframe = ctx.currentStackframe
 
   case n.kind
   of IntLit:
@@ -100,12 +63,12 @@ proc transformSimpleRvalue(ctx: var MaContext, n: var Cursor) =
     if desc.typ.size > 8:
       ctx.error("too large for simple rvalue", n)
 
-    if desc.offset == 0:
-      ctx.dest.addIdent "pstackframe"
-    else:
-      ctx.makeTree "+", n.info:
-        ctx.dest.addIdent "pstackframe"
-        ctx.dest.addIntLit desc.offset
+    if desc.typ.size == 0:
+      ctx.error "expected non-zero size for simple rvalue", n
+    
+    ctx.makeTree "-", n.info:
+      ctx.dest.addIdent "rbp"
+      ctx.dest.addIntLit stackframe.size - desc.offset
 
     inc n
 
@@ -121,7 +84,9 @@ proc transformSimpleLvalue(ctx: var MaContext, n: var Cursor) =
 proc transformVar(ctx: var MaContext, n: var Cursor) =
   inc n
 
-  var desc = VarDesc()
+  let stackframe = ctx.currentStackframe
+
+
   var name = ""
 
   # - name -
@@ -131,6 +96,8 @@ proc transformVar(ctx: var MaContext, n: var Cursor) =
     inc n
 
   else: ctx.error("expected ident, but got", n)
+  
+  let desc = stackframe.vars[name].addr
 
 
   # - pragmas -
@@ -141,7 +108,7 @@ proc transformVar(ctx: var MaContext, n: var Cursor) =
   else: ctx.error("expected '.', but got", n)
 
   # - type -
-  desc.typ = transformType(ctx, n)
+  ctx.skipTree n
 
 
   # - init -
@@ -149,24 +116,12 @@ proc transformVar(ctx: var MaContext, n: var Cursor) =
   of DotToken:
     inc n
 
-  else: ctx.error("expected '.', but got", n)
+  else:
+    # todo
+    ctx.error("expected '.', but got", n)
 
 
   ctx.skipParRi n
-
-
-  let stackframe = ctx.stackframe.addr
-  
-  desc.offset = block:
-    var r = 0
-    for v in stackframe.vars.values:
-      r = max(r, v.offset + v.typ.size)
-    r
-
-  if desc.offset mod desc.typ.align != 0:
-    desc.offset += desc.typ.align - (desc.offset mod desc.typ.align)
-
-  stackframe.vars[name] = desc
 
 
 
@@ -179,28 +134,24 @@ proc transformAsgn(ctx: var MaContext, n: var Cursor) =
   let destvar = lookupSym(ctx, n)
 
   if destvar.typ.size > 8:
-    ctx.error("currently machina does not support more than 8 bytes assignmets", n)
+    ctx.error("currently machina does not support assignmets for more than 8 bytes", n)
 
-  ctx.makeTree "asgn", linfo:
-    ctx.dest.addIntLit destvar.typ.size * 8  # bits
-    
-    transformSimpleLvalue(ctx, n)
-    transformSimpleRvalue(ctx, n)
+  if destvar.typ.size != 0:
+    ctx.makeTree "asgn", linfo:
+      ctx.dest.addIntLit destvar.typ.size * 8  # bits
+      
+      transformSimpleLvalue(ctx, n)
+      transformSimpleRvalue(ctx, n)
   
   ctx.skipParRi n
 
 
 
 proc genRet(ctx: var MaContext, n: var Cursor) =
-  ctx.makeTree "asgn", n.info:
-    ctx.dest.addIntLit ctx.config.bits
-    ctx.dest.addIdent "pstack"
-    ctx.dest.addIdent "pstackframe"
+  ctx.makeTree "popStackframe", n.info:
+    ctx.dest.addIntLit ctx.currentStackframe.size
 
-  ctx.makeTree "pop", n.info:
-    ctx.dest.addIdent "pstackframe"
-
-  ctx.dest.addIdent "ret"
+  ctx.dest.addIdent "ret", n.info
 
 
 
@@ -212,12 +163,12 @@ proc transformRet(ctx: var MaContext, n: var Cursor) =
   let desc = lookupSym(ctx, n)
 
   if desc.typ.size > 8:
-    ctx.error("currently machina does not support more than 8 bytes return values", n)
+    ctx.error("currently machina does not support return values for more than 8 bytes", n)
 
   ctx.makeTree "asgn", linfo:
     ctx.dest.addIntLit desc.typ.size * 8  # bits
     
-    ctx.dest.add tagToken("retreg", linfo)
+    ctx.dest.addIdent "r1"
     transformSimpleRvalue(ctx, n)
   
   genRet(ctx, n)
@@ -281,15 +232,15 @@ proc transformProc(ctx: var MaContext, n: var Cursor) =
 
   
   # - stmts -
-  ctx.makeTree "push", n.info:
-    ctx.dest.addIdent "pstackframe"
+  block visitVars:
+    var n2 = n
+    visitVarsStmts(ctx, n2)
 
-  ctx.makeTree "asgn", n.info:
-    ctx.dest.addIntLit ctx.config.bits
-    ctx.dest.addIdent "pstackframe"
-    ctx.dest.addIdent "pstack"
-  
-  # todo: sub stack to stackframe total size
+    let stackframe = ctx.currentStackframe
+    stackframe.size = querySize(stackframe[])
+
+  ctx.makeTree "pushStackframe", n.info:
+    ctx.dest.addIntLit ctx.currentStackframe.size
 
   ctx.with procsAllowed, false:
     transformStmts(ctx, n)
